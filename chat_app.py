@@ -16,13 +16,50 @@ def load_data():
     return load_index()  # returns (embeddings, documents, metadatas, bm25)
 
 
+def expand_query(question: str, client: Anthropic) -> list[str]:
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=256,
+        messages=[{
+            "role": "user",
+            "content": (
+                "Generate 3 alternative phrasings of this question about affordable housing finance, "
+                "using different terminology that might appear in policy documents, tax law, or handbooks. "
+                "Return only the 3 phrasings as a numbered list, no explanation.\n\n"
+                f"Question: {question}"
+            )
+        }]
+    )
+    lines = response.content[0].text.strip().split("\n")
+    variants = [l.lstrip("123456789. )").strip() for l in lines if l.strip()]
+    return [question] + variants[:3]
+
+
 def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
     model = load_model()
     embeddings, documents, metadatas, bm25 = load_data()
-    context, sources = query_index(question, model, embeddings, documents, metadatas, bm25)
 
     api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
     client = Anthropic(api_key=api_key)
+
+    # expand query into multiple phrasings, merge retrieved chunks
+    queries = expand_query(question, client)
+    seen = set()
+    merged_chunks = []
+    merged_metas = []
+    for q in queries:
+        context, sources = query_index(q, model, embeddings, documents, metadatas, bm25, n_results=10)
+        for chunk, meta in zip(context.split("\n\n---\n\n"), sources):
+            key = meta["filename"] + meta["chapter"]
+            if key not in seen:
+                seen.add(key)
+                merged_chunks.append(chunk)
+                merged_metas.append(meta)
+
+    # cap at 20 unique chunks to keep context manageable
+    merged_chunks = merged_chunks[:20]
+    merged_metas = merged_metas[:20]
+    context = "\n\n---\n\n".join(merged_chunks)
 
     system = (
         "You are a senior tax credit accountant specializing in affordable housing finance in Washington State. "
@@ -51,7 +88,7 @@ def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         system=system,
         messages=messages,
     )
-    return response.content[0].text, sources
+    return response.content[0].text, merged_metas
 
 
 def main():
