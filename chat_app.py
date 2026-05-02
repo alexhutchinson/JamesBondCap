@@ -35,14 +35,10 @@ def expand_query(question: str, client: Anthropic) -> list[str]:
     return [question] + variants[:3]
 
 
-def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
+def get_context(question: str, client: Anthropic) -> tuple[str, list, list]:
     model = load_model()
     embeddings, documents, metadatas, bm25 = load_data()
 
-    api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-    client = Anthropic(api_key=api_key)
-
-    # expand query into multiple phrasings, merge retrieved chunks
     queries = expand_query(question, client)
     seen = set()
     merged_chunks = []
@@ -56,12 +52,14 @@ def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
                 merged_chunks.append(chunk)
                 merged_metas.append(meta)
 
-    # cap at 20 unique chunks to keep context manageable
     merged_chunks = merged_chunks[:20]
     merged_metas = merged_metas[:20]
     context = "\n\n---\n\n".join(merged_chunks)
+    return context, merged_metas, merged_chunks
 
-    system = (
+
+def build_system(context: str) -> str:
+    return (
         "You are a senior tax credit accountant specializing in affordable housing finance in Washington State. "
         "You have deep expertise in Low Income Housing Tax Credits (LIHTC), tax-exempt bond financing, "
         "HUD programs, and Washington-specific agencies including the Washington State Housing Finance Commission (WSHFC). "
@@ -82,16 +80,6 @@ def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         f"{context}"
     )
 
-    messages = history + [{"role": "user", "content": question}]
-
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2048,
-        system=system,
-        messages=messages,
-    )
-    return response.content[0].text, merged_metas, merged_chunks
-
 
 def main():
     st.title("Novogradac RAG Chatbot")
@@ -99,31 +87,56 @@ def main():
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "sources" not in st.session_state:
+        st.session_state.sources = []
+    if "chunks" not in st.session_state:
+        st.session_state.chunks = []
 
-    for msg in st.session_state.messages:
+    for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant" and i // 2 < len(st.session_state.sources):
+                src_idx = i // 2
+                with st.expander("Sources"):
+                    for s, chunk in zip(st.session_state.sources[src_idx], st.session_state.chunks[src_idx]):
+                        first_line = chunk.split("\n")[1].strip() if "\n" in chunk else chunk[:80]
+                        st.write(f"**{s['chapter']}** — {first_line[:100]}")
 
     if prompt := st.chat_input("Ask about affordable housing finance..."):
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        history = [
-            {"role": m["role"], "content": m["content"]}
-            for m in st.session_state.messages
-        ]
+        api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+        client = Anthropic(api_key=api_key)
+
+        history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
+
+        with st.spinner("Finding relevant sources..."):
+            context, metas, chunks = get_context(prompt, client)
 
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                answer, sources, chunks = get_answer(prompt, history)
-            st.markdown(answer)
+            answer_placeholder = st.empty()
+            full_answer = ""
+            with client.messages.stream(
+                model="claude-sonnet-4-6",
+                max_tokens=2048,
+                system=build_system(context),
+                messages=history + [{"role": "user", "content": prompt}],
+            ) as stream:
+                for text in stream.text_stream:
+                    full_answer += text
+                    answer_placeholder.markdown(full_answer + "▌")
+            answer_placeholder.markdown(full_answer)
+
             with st.expander("Sources"):
-                for s, chunk in zip(sources, chunks):
+                for s, chunk in zip(metas, chunks):
                     first_line = chunk.split("\n")[1].strip() if "\n" in chunk else chunk[:80]
                     st.write(f"**{s['chapter']}** — {first_line[:100]}")
 
         st.session_state.messages.append({"role": "user", "content": prompt})
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+        st.session_state.messages.append({"role": "assistant", "content": full_answer})
+        st.session_state.sources.append(metas)
+        st.session_state.chunks.append(chunks)
 
 
 if __name__ == "__main__":
