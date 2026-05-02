@@ -13,13 +13,13 @@ def load_model():
 
 @st.cache_resource
 def load_data():
-    return load_index()
+    return load_index()  # returns (embeddings, documents, metadatas, bm25)
 
 
 def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
     model = load_model()
-    embeddings, documents, metadatas = load_data()
-    context, sources = query_index(question, model, embeddings, documents, metadatas)
+    embeddings, documents, metadatas, bm25 = load_data()
+    context, sources = query_index(question, model, embeddings, documents, metadatas, bm25)
 
     api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
     client = Anthropic(api_key=api_key)

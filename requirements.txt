@@ -2,3 +2,4 @@ anthropic==0.82.0
 sentence-transformers==5.4.1
 streamlit==1.57.0
 numpy
+rank-bm25
