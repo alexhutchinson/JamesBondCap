@@ -7,20 +7,14 @@ INDEX_PATH = Path(__file__).parent / "index.npz"
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 
-def query_index(
-    question: str,
-    index_path: Path = INDEX_PATH,
-    n_results: int = 8,
-) -> tuple[str, list[dict]]:
+def load_index(index_path: Path = INDEX_PATH):
     data = np.load(index_path, allow_pickle=True)
-    embeddings = data["embeddings"]
-    documents = data["documents"].tolist()
-    metadatas = data["metadatas"].tolist()
+    return data["embeddings"], data["documents"].tolist(), data["metadatas"].tolist()
 
-    model = SentenceTransformer(MODEL_NAME)
+
+def query_index(question: str, model, embeddings, documents, metadatas, n_results: int = 8):
     q_embedding = model.encode([question])[0]
 
-    # cosine similarity
     norms = np.linalg.norm(embeddings, axis=1)
     q_norm = np.linalg.norm(q_embedding)
     scores = (embeddings @ q_embedding) / (norms * q_norm + 1e-9)

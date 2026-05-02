@@ -1,12 +1,26 @@
 import os
 import streamlit as st
 from anthropic import Anthropic
+from sentence_transformers import SentenceTransformer
 
-from index_pipeline import query_index
+from index_pipeline import load_index, query_index, MODEL_NAME
+
+
+@st.cache_resource
+def load_model():
+    return SentenceTransformer(MODEL_NAME)
+
+
+@st.cache_resource
+def load_data():
+    return load_index()
 
 
 def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
-    context, sources = query_index(question)
+    model = load_model()
+    embeddings, documents, metadatas = load_data()
+    context, sources = query_index(question, model, embeddings, documents, metadatas)
+
     api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
     client = Anthropic(api_key=api_key)
 
