@@ -75,6 +75,8 @@ def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         "For each question, the most relevant excerpts from these documents are provided below. "
         "Answer naturally and directly — never mention retrieval, semantic search, embeddings, chunks, or indexing. "
         "Never tell the user a section wasn't 'retrieved' or 'surfaced.' "
+        "When citing content, always include the specific section number or subsection (e.g., 'WSHFC Bond Policies Section 3.31', "
+        "'IRC §42(g)(1)', 'Novogradac Chapter 2, Section 2.3'). These section numbers appear in the excerpts — use them. "
         "If the excerpts don't cover the question, just answer from your own expertise and note it's not from the provided documents.\n\n"
         "Relevant excerpts:\n\n"
         f"{context}"
@@ -88,7 +90,7 @@ def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         system=system,
         messages=messages,
     )
-    return response.content[0].text, merged_metas
+    return response.content[0].text, merged_metas, merged_chunks
 
 
 def main():
@@ -113,11 +115,12 @@ def main():
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                answer, sources = get_answer(prompt, history)
+                answer, sources, chunks = get_answer(prompt, history)
             st.markdown(answer)
             with st.expander("Sources"):
-                for s in sources:
-                    st.write(f"**{s['chapter']}** — {s['filename']}")
+                for s, chunk in zip(sources, chunks):
+                    first_line = chunk.split("\n")[1].strip() if "\n" in chunk else chunk[:80]
+                    st.write(f"**{s['chapter']}** — {first_line[:100]}")
 
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.session_state.messages.append({"role": "assistant", "content": answer})
