@@ -12,7 +12,7 @@ def load_index(index_path: Path = INDEX_PATH):
     return data["embeddings"], data["documents"].tolist(), data["metadatas"].tolist()
 
 
-def query_index(question: str, model, embeddings, documents, metadatas, n_results: int = 8):
+def query_index(question: str, model, embeddings, documents, metadatas, n_results: int = 12):
     q_embedding = model.encode([question])[0]
 
     norms = np.linalg.norm(embeddings, axis=1)
