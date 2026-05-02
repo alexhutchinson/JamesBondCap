@@ -1,26 +1,35 @@
 from pathlib import Path
 
-import chromadb
+import numpy as np
 from sentence_transformers import SentenceTransformer
 
-CHROMA_PATH = Path(__file__).parent / "chroma_db"
+INDEX_PATH = Path(__file__).parent / "index.npz"
+MODEL_NAME = "all-MiniLM-L6-v2"
 
 
 def query_index(
     question: str,
-    chroma_path: Path = CHROMA_PATH,
+    index_path: Path = INDEX_PATH,
     n_results: int = 8,
 ) -> tuple[str, list[dict]]:
-    client = chromadb.PersistentClient(path=str(chroma_path))
-    collection = client.get_collection("novogradac")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    data = np.load(index_path, allow_pickle=True)
+    embeddings = data["embeddings"]
+    documents = data["documents"].tolist()
+    metadatas = data["metadatas"].tolist()
 
-    embedding = model.encode([question])[0].tolist()
-    results = collection.query(query_embeddings=[embedding], n_results=n_results)
+    model = SentenceTransformer(MODEL_NAME)
+    q_embedding = model.encode([question])[0]
 
-    chunks = results["documents"][0]
-    metadatas = results["metadatas"][0]
+    # cosine similarity
+    norms = np.linalg.norm(embeddings, axis=1)
+    q_norm = np.linalg.norm(q_embedding)
+    scores = (embeddings @ q_embedding) / (norms * q_norm + 1e-9)
+
+    top_indices = np.argsort(scores)[::-1][:n_results]
+    chunks = [documents[i] for i in top_indices]
+    metas = [metadatas[i] for i in top_indices]
+
     context = "\n\n---\n\n".join(
-        f"[{m['chapter']}]\n{c}" for c, m in zip(chunks, metadatas)
+        f"[{m['chapter']}]\n{c}" for c, m in zip(chunks, metas)
     )
-    return context, metadatas
+    return context, metas

@@ -1,5 +1,4 @@
 anthropic==0.82.0
-chromadb==1.5.8
 sentence-transformers==5.4.1
 streamlit==1.57.0
-python-dotenv==1.2.1
+numpy
