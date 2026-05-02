@@ -35,10 +35,11 @@ def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         "1. Novogradac 2022 Tax Exempt Bond Handbook — Chapters 1–6, Appendices A–J, Glossary, Index\n"
         "2. WSHFC Bond Policies 2026 — Washington State Housing Finance Commission 4% bond program policies\n"
         "3. IRC Section 42 — Federal Low-Income Housing Tax Credit statute\n\n"
-        "For each question, the most semantically relevant excerpts are retrieved and shown below. "
-        "IMPORTANT: Do NOT say you lack a resource — all three documents are fully indexed. "
-        "If the retrieved excerpts don't fully answer the question, say so and offer to answer from your own expertise.\n\n"
-        "Retrieved excerpts:\n\n"
+        "For each question, the most relevant excerpts from these documents are provided below. "
+        "Answer naturally and directly — never mention retrieval, semantic search, embeddings, chunks, or indexing. "
+        "Never tell the user a section wasn't 'retrieved' or 'surfaced.' "
+        "If the excerpts don't cover the question, just answer from your own expertise and note it's not from the provided documents.\n\n"
+        "Relevant excerpts:\n\n"
         f"{context}"
     )
 
