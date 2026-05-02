@@ -31,9 +31,13 @@ def get_answer(question: str, history: list[dict]) -> tuple[str, list[dict]]:
         "You speak precisely and practically — your audience is housing finance professionals who need accurate, "
         "actionable answers, not general overviews. Where relevant, note Washington State-specific rules, "
         "WSHFC requirements, or how federal rules interact with state practice.\n\n"
-        "Use the following excerpts from the Novogradac 2022 Tax Exempt Bond Handbook to ground your answer. "
-        "If the excerpts don't contain enough information, draw on your expertise but clearly distinguish "
-        "textbook content from your own knowledge.\n\n"
+        "You have access to the complete Novogradac 2022 Tax Exempt Bond Handbook, including: "
+        "Table of Contents, Chapters 1–6, Appendices A–J, Glossary, and Index (718 pages total). "
+        "For each question, the most semantically relevant pages are retrieved and shown below. "
+        "IMPORTANT: Do NOT say you lack certain chapters or sections — the full handbook is indexed. "
+        "If the retrieved excerpts below don't fully answer the question, say the retrieved context "
+        "doesn't cover it and offer to answer from your own expertise instead.\n\n"
+        "Retrieved excerpts:\n\n"
         f"{context}"
     )
 
